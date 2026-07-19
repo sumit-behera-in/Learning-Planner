@@ -8,6 +8,9 @@ import `in`.sumit.learningplanner.domain.model.DashboardStats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,11 +30,11 @@ class DashboardViewModel @Inject constructor(
             taskRepository.getAllTasks().collect { tasks ->
                 val total = tasks.size
                 val completed = tasks.count { it.isCompleted }
-                val currentTime = System.currentTimeMillis()
-                
-                // Very basic stat calculation for now
-                val overdue = tasks.count { !it.isCompleted && it.date < currentTime - 86400000 }
-                
+                val todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val overdue = tasks.count { task ->
+                    !task.isCompleted && task.date < todayStart
+                }
+
                 _stats.value = DashboardStats(
                     totalTaskCount = total,
                     completedTaskCount = completed,

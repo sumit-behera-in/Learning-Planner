@@ -7,9 +7,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import `in`.sumit.learningplanner.data.csv.CsvImporter
 import `in`.sumit.learningplanner.data.repository.TaskRepository
 import `in`.sumit.learningplanner.domain.model.Task
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,8 +25,8 @@ class HomeViewModel @Inject constructor(
     val tasks: StateFlow<List<Task>> = taskRepository.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _importStatus = MutableStateFlow<String?>(null)
-    val importStatus: StateFlow<String?> = _importStatus
+    private val _importEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val importEvents: SharedFlow<String> = _importEvents.asSharedFlow()
 
     fun updateSubTaskCompletion(subTaskId: Long, isCompleted: Boolean, taskId: Long) {
         viewModelScope.launch {
@@ -33,7 +35,6 @@ class HomeViewModel @Inject constructor(
     }
 
     fun completeTask(taskId: Long, isCompleted: Boolean) {
-        // Automatically completes all subtasks if task is marked complete from root
         viewModelScope.launch {
             val task = taskRepository.getTaskById(taskId)
             task?.subtasks?.forEach { subTask ->
@@ -41,15 +42,14 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun importCsv(uri: Uri) {
         viewModelScope.launch {
-            _importStatus.value = "Importing..."
             val result = csvImporter.importCsv(uri)
             result.onSuccess { count ->
-                _importStatus.value = "Successfully imported $count tasks"
+                _importEvents.emit("Successfully imported $count tasks")
             }.onFailure { e ->
-                _importStatus.value = "Import failed: ${e.message}"
+                _importEvents.emit("Import failed: ${e.message}")
             }
         }
     }

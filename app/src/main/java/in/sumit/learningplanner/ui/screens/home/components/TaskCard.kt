@@ -36,7 +36,8 @@ fun TaskCard(
     onTaskComplete: (Boolean) -> Unit,
     onSubTaskComplete: (Long, Boolean) -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    completionLabel: String? = null
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
@@ -68,6 +69,13 @@ fun TaskCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    completionLabel?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             

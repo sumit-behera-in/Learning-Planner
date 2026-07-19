@@ -9,7 +9,7 @@ import `in`.sumit.learningplanner.domain.model.SubTask
 import `in`.sumit.learningplanner.domain.model.SubTaskType
 import `in`.sumit.learningplanner.domain.model.Task
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
@@ -19,13 +19,17 @@ class TaskRepositoryImpl @Inject constructor(
 ) : TaskRepository {
 
     override fun getAllTasks(): Flow<List<Task>> {
-        return taskDao.getAllTasks().map { list ->
-            list.map { it.toDomainModel() }
+        return taskDao.getAllTasks().combine(completionHistoryDao.getAllHistory()) { taskRows, historyRows ->
+            val completionTimes = historyRows
+                .groupBy { it.taskId }
+                .mapValues { entry -> entry.value.maxOfOrNull { it.completedAt } }
+
+            taskRows.map { it.toDomainModel(completionTimes[it.task.id]) }
         }
     }
 
     override suspend fun getTaskById(taskId: Long): Task? {
-        return taskDao.getTaskById(taskId)?.toDomainModel()
+        return taskDao.getTaskById(taskId)?.toDomainModel(null)
     }
 
     override suspend fun updateSubTaskCompletion(subTaskId: Long, isCompleted: Boolean, taskId: Long) {
@@ -44,9 +48,9 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun checkAndUpdateTaskCompletion(taskId: Long) {
         val subTasks = subTaskDao.getSubTasksForTask(taskId)
         val allCompleted = subTasks.isNotEmpty() && subTasks.all { it.isCompleted }
-        
+
         taskDao.updateTaskCompletion(taskId, allCompleted)
-        
+
         if (allCompleted) {
             completionHistoryDao.insertHistory(
                 CompletionHistoryEntity(taskId = taskId, type = "TASK")
@@ -54,7 +58,7 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun TaskWithSubTasks.toDomainModel(): Task {
+    private fun TaskWithSubTasks.toDomainModel(completedAt: Long?): Task {
         return Task(
             id = task.id,
             title = task.title,
@@ -72,11 +76,12 @@ class TaskRepositoryImpl @Inject constructor(
             isCompleted = task.isCompleted,
             reminderTime = task.reminderTime,
             createdAt = task.createdAt,
+            completedAt = completedAt,
             subtasks = subTasks.map {
                 SubTask(
                     id = it.id,
                     taskId = it.taskId,
-                    type = try { SubTaskType.valueOf(it.type) } catch(e: Exception) { SubTaskType.THEORY },
+                    type = try { SubTaskType.valueOf(it.type) } catch (e: Exception) { SubTaskType.THEORY },
                     content = it.content,
                     isCompleted = it.isCompleted
                 )
