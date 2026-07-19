@@ -1,5 +1,8 @@
 package `in`.sumit.learningplanner.ui.screens.home
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,9 +17,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import `in`.sumit.learningplanner.ui.screens.home.components.TaskCard
@@ -27,14 +32,29 @@ fun HomeScreen(
     onNavigateToTask: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val tasks by viewModel.tasks.collectAsState()
+    val importStatus by viewModel.importStatus.collectAsState()
+
+    val csvPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri -> uri?.let { viewModel.importCsv(it) } }
+    )
+
+    LaunchedEffect(importStatus) {
+        importStatus?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Learning Planner") })
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* TODO implement CSV import here or in Settings */ }) {
+            FloatingActionButton(onClick = {
+                csvPickerLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*"))
+            }) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Tasks")
             }
         }

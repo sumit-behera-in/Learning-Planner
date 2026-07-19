@@ -40,7 +40,8 @@ jobs:
           VERSION_CODE=$(grep 'versionCode =' $FILE | head -1 | grep -o '[0-9]\+')
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          PATCH=$((PATCH+1))
+          MINOR=$((MINOR+1))
+          PATCH=0
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           NEW_CODE=$((VERSION_CODE+1))
@@ -63,11 +64,17 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Rename APK
+        shell: bash
         run: |
-          mkdir release
-          cp app/build/outputs/apk/release/app-release.apk \
-          "release/Learning Planner (V${{ steps.version.outputs.version }}).apk"
+            APK=$(find app/build -name "*.apk" | head -n 1)
 
+            if [ -z "$APK" ]; then
+            echo "No APK found!"
+            exit 1
+            fi
+
+            mkdir -p release
+            cp "$APK" "release/Learning Planner (V${{ steps.version.outputs.version }}).apk"
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

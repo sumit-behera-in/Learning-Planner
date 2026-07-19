@@ -1,10 +1,13 @@
 package `in`.sumit.learningplanner.ui.screens.home
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import `in`.sumit.learningplanner.data.csv.CsvImporter
 import `in`.sumit.learningplanner.data.repository.TaskRepository
 import `in`.sumit.learningplanner.domain.model.Task
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -13,11 +16,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val csvImporter: CsvImporter
 ) : ViewModel() {
 
     val tasks: StateFlow<List<Task>> = taskRepository.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _importStatus = MutableStateFlow<String?>(null)
+    val importStatus: StateFlow<String?> = _importStatus
 
     fun updateSubTaskCompletion(subTaskId: Long, isCompleted: Boolean, taskId: Long) {
         viewModelScope.launch {
@@ -35,6 +42,18 @@ class HomeViewModel @Inject constructor(
         }
     }
     
+    fun importCsv(uri: Uri) {
+        viewModelScope.launch {
+            _importStatus.value = "Importing..."
+            val result = csvImporter.importCsv(uri)
+            result.onSuccess { count ->
+                _importStatus.value = "Successfully imported $count tasks"
+            }.onFailure { e ->
+                _importStatus.value = "Import failed: ${e.message}"
+            }
+        }
+    }
+
     fun deleteTask(taskId: Long) {
         viewModelScope.launch {
             taskRepository.deleteTask(taskId)
